@@ -1,0 +1,7 @@
+services:
+  dive-poc:
+    build: .
+    image: ghcr.io/diveprotocol/dive-tools:latest
+    ports:
+      - "8080:5000"
+    restart: unless-stopped
