@@ -32,15 +32,17 @@ def check_dive_protection(url: str, require_dnssec: bool = True) -> DiveCheckRes
         result.scope = policy.get("scopes", [None])[0] if policy.get("scopes") else None
         result.policy_domain = policy.get("_fqdn", "").replace("_dive.", "")
         result.policy_fqdn = fqdn
-        result.dnssec_validated = policy.get("_dnssec_validated", False)
         result.directives = policy.get("directives", [])
+
+        # DNSSEC is valid only if ALL records in the chain are validated
+        result.dnssec_validated = all(
+            record.get("_dnssec_validated", False) for record in policy_records
+        )
 
         # Check for keys if scopes are defined
         if result.scope:
             scopes = policy.get("scopes", [])
             if scopes:
-                # Try to find at least one key for demonstration
-                # In a real scenario, you'd check all keys for all scopes
                 try:
                     keys = get_key_record_walk(fqdn, "key1")  # Example: check for "key1"
                     result.keys = [
@@ -52,6 +54,12 @@ def check_dive_protection(url: str, require_dnssec: bool = True) -> DiveCheckRes
                         }
                         for key in keys
                     ]
+
+                    # DNSSEC of keys must also be consistent with the policy chain
+                    if result.keys:
+                        keys_dnssec = all(k["dnssec_validated"] for k in result.keys)
+                        result.dnssec_validated = result.dnssec_validated and keys_dnssec
+
                 except DiveRecordNotFound:
                     pass  # No keys found (but policy exists, so still protected)
 
